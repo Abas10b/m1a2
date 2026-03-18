@@ -1,10 +1,8 @@
-
 import asyncio
 import os
 from dotenv import load_dotenv
 from deepgram import (
     DeepgramClient,
-    DeepgramClientOptions,
     LiveTranscriptionEvents,
     LiveOptions,
     Microphone
@@ -31,9 +29,9 @@ async def get_transcript(callback):
     transcription_complete = asyncio.Event()
 
     try:
-        # Modern client initialization compatible with SDK v3+
-        config = DeepgramClientOptions(keep_alive="true")
-        deepgram = DeepgramClient(os.getenv("DEEPGRAM_API_KEY"), config)
+        # v6.0.1 Fix: Simplified initialization. 
+        # No need for DeepgramClientOptions import.
+        deepgram = DeepgramClient(os.getenv("DEEPGRAM_API_KEY"))
 
         dg_connection = deepgram.listen.asyncwebsocket.v("1")
 
@@ -46,7 +44,6 @@ async def get_transcript(callback):
             if result.is_final:
                 transcript_collector.add_part(sentence)
                 
-                # Check if this is the end of the user's thought
                 if result.speech_final:
                     full_sentence = transcript_collector.get_full_transcript().strip()
                     if full_sentence:
@@ -55,9 +52,7 @@ async def get_transcript(callback):
                         transcript_collector.reset()
                         transcription_complete.set()
 
-        # FIX: Updated event name for modern SDK
         dg_connection.on(LiveTranscriptionEvents.Transcript, on_message)
-        dg_connection.on(LiveTranscriptionEvents.Error, lambda self, error, **kwargs: print(f"STT Error: {error}"))
 
         options = LiveOptions(
             model="nova-2",
@@ -66,14 +61,12 @@ async def get_transcript(callback):
             encoding="linear16",
             channels=1,
             sample_rate=16000,
-            # INCREASED: This waits 2 seconds before deciding you are done speaking
-            endpointing=2000, 
+            endpointing=2000, # Waits 2 seconds so you aren't cut off
             smart_format=True,
         )
 
         await dg_connection.start(options)
 
-        # Open microphone using same hardware settings as TTS
         microphone = Microphone(dg_connection.send)
         microphone.start()
 
@@ -83,7 +76,7 @@ async def get_transcript(callback):
         await dg_connection.finish()
 
     except Exception as e:
-        print(f"STT Connection Failed: {e}")
+        print(f"STT Error: {e}")
         return
 
 transcription_response = ""

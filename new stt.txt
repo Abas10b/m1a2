@@ -1,26 +1,23 @@
-
 import asyncio
 import os
 from dotenv import load_dotenv
-from deepgram import (
-    DeepgramClient,
-    LiveTranscriptionEvents,
-    LiveOptions,
-    Microphone
-)
+
+# 1. Import the core client and microphone
+from deepgram import DeepgramClient, Microphone
+
+# 2. THE FIX: Direct access to the models for v6.0.1
+from deepgram.models.listen.v1 import LiveOptions
+from deepgram.core.events import EventType
 
 load_dotenv()
 
 class TranscriptCollector:
     def __init__(self):
         self.reset()
-
     def reset(self):
         self.transcript_parts = []
-
     def add_part(self, part):
         self.transcript_parts.append(part)
-
     def get_full_transcript(self):
         return ' '.join(self.transcript_parts)
 
@@ -30,18 +27,16 @@ async def get_transcript(callback):
     transcription_complete = asyncio.Event()
 
     try:
+        # Standard v6 initialization
         deepgram = DeepgramClient(os.getenv("DEEPGRAM_API_KEY"))
         dg_connection = deepgram.listen.asyncwebsocket.v("1")
 
         async def on_message(self, result, **kwargs):
             sentence = result.channel.alternatives[0].transcript
-            
             if len(sentence.strip()) == 0:
                 return
-
             if result.is_final:
                 transcript_collector.add_part(sentence)
-                
                 if result.speech_final:
                     full_sentence = transcript_collector.get_full_transcript().strip()
                     if full_sentence:
@@ -50,7 +45,8 @@ async def get_transcript(callback):
                         transcript_collector.reset()
                         transcription_complete.set()
 
-        dg_connection.on(LiveTranscriptionEvents.Transcript, on_message)
+        # FIX: Using EventType.TRANSCRIPT instead of the old name
+        dg_connection.on(EventType.TRANSCRIPT, on_message)
 
         options = LiveOptions(
             model="nova-2",
@@ -66,18 +62,14 @@ async def get_transcript(callback):
         await dg_connection.start(options)
         microphone = Microphone(dg_connection.send)
         microphone.start()
-
         await transcription_complete.wait()
-
         microphone.finish()
         await dg_connection.finish()
-
     except Exception as e:
         print(f"STT Error: {e}")
         return
 
 transcription_response = ""
-
 def handle_full_sentence(full_sentence):
     global transcription_response
     transcription_response = full_sentence

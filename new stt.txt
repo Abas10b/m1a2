@@ -3,7 +3,7 @@ import asyncio
 import os
 from dotenv import load_dotenv
 
-# Standard v3 imports - your IDE will "resolve" these immediately
+# These will now be recognized by your IDE in v3.7.0
 from deepgram import (
     DeepgramClient,
     DeepgramClientOptions,
@@ -30,11 +30,11 @@ async def get_transcript(callback):
     transcription_complete = asyncio.Event()
 
     try:
-        # Standard v3 Client setup
+        # Standard v3 initialization
         config = DeepgramClientOptions(options={"keepalive": "true"})
         deepgram = DeepgramClient(os.getenv("DEEPGRAM_API_KEY"), config)
 
-        # In v3, the connection path is asynclive or asyncwebsocket
+        # In v3.7.0, we use asynclive
         dg_connection = deepgram.listen.asynclive.v("1")
 
         async def on_message(self, result, **kwargs):
@@ -47,14 +47,14 @@ async def get_transcript(callback):
                 if result.speech_final:
                     full_sentence = transcript_collector.get_full_transcript().strip()
                     if full_sentence:
-                        print(f"Human: {full_sentence}")
+                        print(f"Jarvis Heard: {full_sentence}")
                         callback(full_sentence)
                         transcript_collector.reset()
+                        # This tells the script we are done after ONE sentence
                         transcription_complete.set()
 
-        # Your IDE will now recognize these Event names
         dg_connection.on(LiveTranscriptionEvents.Transcript, on_message)
-        dg_connection.on(LiveTranscriptionEvents.Error, lambda self, error, **kwargs: print(f"Error: {error}"))
+        dg_connection.on(LiveTranscriptionEvents.Error, lambda self, error, **kwargs: print(f"STT Error: {error}"))
 
         options = LiveOptions(
             model="nova-2",
@@ -63,25 +63,28 @@ async def get_transcript(callback):
             encoding="linear16",
             channels=1,
             sample_rate=16000,
-            endpointing=2000, # Still giving you the 2-second comfort window
+            endpointing=2000, # 2 second wait time
             smart_format=True,
         )
 
         await dg_connection.start(options)
         
-        # Use the Microphone class from deepgram v3
+        # Open mic and KEEP IT OPEN
         microphone = Microphone(dg_connection.send)
         microphone.start()
+        print("\n--- JARVIS IS LISTENING ---")
 
+        # The script stays here until you finish your sentence
         await transcription_complete.wait()
 
         microphone.finish()
         await dg_connection.finish()
+        print("--- CONNECTION CLOSED ---\n")
 
     except Exception as e:
-        print(f"STT Error: {e}")
+        print(f"STT System Error: {e}")
 
 if __name__ == "__main__":
-    def test_callback(text): print(f"DEBUG: {text}")
+    def test_callback(text): pass 
     asyncio.run(get_transcript(test_callback))
 

@@ -1,8 +1,9 @@
+
 import asyncio
 import os
 from dotenv import load_dotenv
 
-# These are the standard v3 imports - your IDE will see these!
+# Standard v3 imports - your IDE will "resolve" these immediately
 from deepgram import (
     DeepgramClient,
     DeepgramClientOptions,
@@ -33,6 +34,7 @@ async def get_transcript(callback):
         config = DeepgramClientOptions(options={"keepalive": "true"})
         deepgram = DeepgramClient(os.getenv("DEEPGRAM_API_KEY"), config)
 
+        # In v3, the connection path is asynclive or asyncwebsocket
         dg_connection = deepgram.listen.asynclive.v("1")
 
         async def on_message(self, result, **kwargs):
@@ -50,7 +52,7 @@ async def get_transcript(callback):
                         transcript_collector.reset()
                         transcription_complete.set()
 
-        # Your IDE will recognize these names in v3.7.0
+        # Your IDE will now recognize these Event names
         dg_connection.on(LiveTranscriptionEvents.Transcript, on_message)
         dg_connection.on(LiveTranscriptionEvents.Error, lambda self, error, **kwargs: print(f"Error: {error}"))
 
@@ -61,11 +63,13 @@ async def get_transcript(callback):
             encoding="linear16",
             channels=1,
             sample_rate=16000,
-            endpointing=2000, # Still using the 2s delay for you
+            endpointing=2000, # Still giving you the 2-second comfort window
             smart_format=True,
         )
 
         await dg_connection.start(options)
+        
+        # Use the Microphone class from deepgram v3
         microphone = Microphone(dg_connection.send)
         microphone.start()
 
@@ -78,6 +82,6 @@ async def get_transcript(callback):
         print(f"STT Error: {e}")
 
 if __name__ == "__main__":
-    def handle_full_sentence(text): print(f"Final: {text}")
-    asyncio.run(get_transcript(handle_full_sentence))
+    def test_callback(text): print(f"DEBUG: {text}")
+    asyncio.run(get_transcript(test_callback))
 

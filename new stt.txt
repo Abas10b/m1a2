@@ -1,3 +1,4 @@
+
 import asyncio
 import os
 from dotenv import load_dotenv
@@ -29,10 +30,7 @@ async def get_transcript(callback):
     transcription_complete = asyncio.Event()
 
     try:
-        # v6.0.1 Fix: Simplified initialization. 
-        # No need for DeepgramClientOptions import.
         deepgram = DeepgramClient(os.getenv("DEEPGRAM_API_KEY"))
-
         dg_connection = deepgram.listen.asyncwebsocket.v("1")
 
         async def on_message(self, result, **kwargs):
@@ -61,12 +59,11 @@ async def get_transcript(callback):
             encoding="linear16",
             channels=1,
             sample_rate=16000,
-            endpointing=2000, # Waits 2 seconds so you aren't cut off
+            endpointing=2000,
             smart_format=True,
         )
 
         await dg_connection.start(options)
-
         microphone = Microphone(dg_connection.send)
         microphone.start()
 
